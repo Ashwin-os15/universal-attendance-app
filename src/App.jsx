@@ -231,11 +231,12 @@ function AttendanceApp({ students, onReset }) {
   const [sortBy, setSortBy]                 = useState("default");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  // Cycle: present → absent → od → present
+  // Toggle: only present ↔ absent (OD is separate via button)
   const cycle = (id) => setStatus((prev) => {
     const cur = prev[id] || "present";
-    const next = cur === "present" ? "absent" : cur === "absent" ? "od" : "present";
-    return { ...prev, [id]: next };
+    // If currently OD, tapping row does nothing — use OD button
+    if (cur === "od") return prev;
+    return { ...prev, [id]: cur === "present" ? "absent" : "present" };
   });
 
   // Set OD directly via OD button
@@ -575,7 +576,7 @@ function AttendanceApp({ students, onReset }) {
                       background: rowBg,
                     }}
                   >
-                    {/* Badge */}
+                    {/* Badge - last 2 digits of reg number */}
                     <div style={{
                       width: 36, height: 36, borderRadius: 10,
                       background: badgeColor,
@@ -583,7 +584,9 @@ function AttendanceApp({ students, onReset }) {
                       marginRight: 12, flexShrink: 0,
                     }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: numColor }}>
-                        {student.id}
+                        {student.reg && student.reg !== "N/A"
+                          ? student.reg.slice(-2)
+                          : student.roll.slice(-2)}
                       </span>
                     </div>
 
