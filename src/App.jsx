@@ -213,9 +213,15 @@ function UploadScreen({ onStudentsLoaded }) {
 }
 
 // ── Main Attendance App ───────────────────────────────────────────────────────
+// status: "present" | "absent" | "od"
 function AttendanceApp({ students, onReset }) {
   const today = new Date();
-  const [present, setPresent]   = useState(() => new Set(students.map((s) => s.id)));
+  // status map: id -> "present" | "absent" | "od"
+  const [status, setStatus]     = useState(() => {
+    const m = {};
+    students.forEach((s) => { m[s.id] = "present"; });
+    return m;
+  });
   const [date, setDate]         = useState(today.toISOString().split("T")[0]);
   const [view, setView]         = useState("attendance");
   const [copied, setCopied]     = useState(false);
@@ -225,39 +231,64 @@ function AttendanceApp({ students, onReset }) {
   const [sortBy, setSortBy]                 = useState("default");
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
-  const toggle  = (id) => setPresent((prev) => {
-    const next = new Set(prev);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
+  // Cycle: present → absent → od → present
+  const cycle = (id) => setStatus((prev) => {
+    const cur = prev[id] || "present";
+    const next = cur === "present" ? "absent" : cur === "absent" ? "od" : "present";
+    return { ...prev, [id]: next };
   });
-  const markAll = (val) =>
-    val ? setPresent(new Set(students.map((s) => s.id))) : setPresent(new Set());
 
-  const absentees    = students.filter((s) => !present.has(s.id));
-  const presentCount = present.size;
+  // Set OD directly via OD button
+  const toggleOD = (id, e) => {
+    e.stopPropagation();
+    setStatus((prev) => ({
+      ...prev,
+      [id]: prev[id] === "od" ? "present" : "od",
+    }));
+  };
+
+  const markAll = (val) => {
+    const m = {};
+    students.forEach((s) => { m[s.id] = val; });
+    setStatus(m);
+  };
+
+  const absentees    = students.filter((s) => (status[s.id] || "present") === "absent");
+  const odStudents   = students.filter((s) => (status[s.id] || "present") === "od");
+  const presentCount = students.length - absentees.length; // OD counted as present
   const absentCount  = absentees.length;
+  const odCount      = odStudents.length;
   const displayDate  = fmtDate(date);
 
-  const getSortedAbsentees = () =>
-    [...absentees].sort((a, b) => a.roll.localeCompare(b.roll));
+  const sortByRoll   = (arr) => [...arr].sort((a, b) => a.roll.localeCompare(b.roll));
 
   const buildMessage = (fmt) => {
-    const sorted = getSortedAbsentees();
+    const sortedAbsent = sortByRoll(absentees);
+    const sortedOD     = sortByRoll(odStudents);
     const fmtStudent = (s, i) => {
       if (fmt === "roll") return `${i + 1}. ${s.name} (${s.roll})`;
       if (fmt === "reg")  return `${i + 1}. ${s.name} (${s.reg})`;
       if (fmt === "both") return `${i + 1}. ${s.name} | Roll: ${s.roll} | Reg: ${s.reg}`;
       return `${i + 1}. ${s.name}`;
     };
-    return absentCount === 0
+
+    const absentSection = absentCount > 0
+      ? `*Absentees (sorted by Roll No.):*\n${sortedAbsent.map((s, i) => fmtStudent(s, i)).join("\n")}`
+      : `✅ No Absentees`;
+
+    const odSection = odCount > 0
+      ? `\n\n*On Duty (OD):*\n${sortedOD.map((s, i) => fmtStudent(s, i)).join("\n")}`
+      : "";
+
+    return absentCount === 0 && odCount === 0
       ? `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n✅ Full Attendance! All ${students.length} students were present.\n\n_Made with Uni Attendance_`
-      : `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n👥 Total Students: ${students.length}\n✅ Present: ${presentCount}\n❌ Absent: ${absentCount}\n\n*Absentees (sorted by Roll No.):*\n${sorted.map((s, i) => fmtStudent(s, i)).join("\n")}\n\n_Made with Uni Attendance_`;
+      : `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n👥 Total Students: ${students.length}\n✅ Present: ${presentCount}\n❌ Absent: ${absentCount}${odCount > 0 ? `\n🔵 On Duty: ${odCount}` : ""}\n\n${absentSection}${odSection}\n\n_Made with Uni Attendance_`;
   };
 
   const message = buildMessage(numFormat || "roll");
 
   const handleGenerateClick = () =>
-    absentCount === 0 ? setView("message") : setShowModal(true);
+    (absentCount === 0 && odCount === 0) ? setView("message") : setShowModal(true);
   const handleFormatSelect  = (fmt) => {
     setNumFormat(fmt); setShowModal(false); setView("message");
   };
@@ -434,13 +465,14 @@ function AttendanceApp({ students, onReset }) {
             { label: "Total",   val: students.length, color: "rgba(255,255,255,0.2)" },
             { label: "Present", val: presentCount,     color: "rgba(52,199,89,0.3)"  },
             { label: "Absent",  val: absentCount,      color: "rgba(255,69,58,0.3)"  },
+            { label: "OD",      val: odCount,          color: "rgba(37,99,235,0.35)" },
           ].map((s) => (
             <div key={s.label} style={{
               flex: 1, background: s.color, borderRadius: 14,
-              padding: "10px 8px", textAlign: "center", backdropFilter: "blur(10px)",
+              padding: "10px 4px", textAlign: "center", backdropFilter: "blur(10px)",
             }}>
-              <div style={{ fontSize: 22, fontWeight: 700 }}>{s.val}</div>
-              <div style={{ fontSize: 11, opacity: 0.85, marginTop: 2 }}>{s.label}</div>
+              <div style={{ fontSize: 20, fontWeight: 700 }}>{s.val}</div>
+              <div style={{ fontSize: 10, opacity: 0.85, marginTop: 2 }}>{s.label}</div>
             </div>
           ))}
         </div>
@@ -486,12 +518,12 @@ function AttendanceApp({ students, onReset }) {
                 }}
               />
             </div>
-            <button onClick={() => markAll(true)} style={{
+            <button onClick={() => markAll("present")} style={{
               background: "#34C759", color: "#fff", border: "none",
               borderRadius: 10, padding: "10px 14px",
               fontWeight: 700, fontSize: 12, cursor: "pointer",
             }}>All ✓</button>
-            <button onClick={() => markAll(false)} style={{
+            <button onClick={() => markAll("absent")} style={{
               background: "#FF3B30", color: "#fff", border: "none",
               borderRadius: 10, padding: "10px 14px",
               fontWeight: 700, fontSize: 12, cursor: "pointer",
@@ -524,29 +556,38 @@ function AttendanceApp({ students, onReset }) {
               boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
             }}>
               {filtered.map((student, idx) => {
-                const isPresent = present.has(student.id);
+                const st = status[student.id] || "present";
+                const isPresent = st === "present";
+                const isAbsent  = st === "absent";
+                const isOD      = st === "od";
+                const rowBg = isPresent ? "#fff" : isAbsent ? "rgba(255,59,48,0.04)" : "rgba(37,99,235,0.04)";
+                const badgeColor = isPresent ? "rgba(37,99,235,0.1)" : isAbsent ? "rgba(255,59,48,0.1)" : "rgba(37,99,235,0.15)";
+                const numColor = isPresent ? "#2563EB" : isAbsent ? "#FF3B30" : "#2563EB";
                 return (
                   <div
                     key={student.id}
-                    onClick={() => toggle(student.id)}
+                    onClick={() => cycle(student.id)}
                     style={{
                       display: "flex", alignItems: "center",
                       padding: "13px 16px",
                       borderBottom: idx < filtered.length - 1 ? "1px solid #F2F2F7" : "none",
                       cursor: "pointer",
-                      background: isPresent ? "#fff" : "rgba(255,59,48,0.04)",
+                      background: rowBg,
                     }}
                   >
+                    {/* Badge */}
                     <div style={{
                       width: 36, height: 36, borderRadius: 10,
-                      background: isPresent ? "rgba(37,99,235,0.1)" : "rgba(255,59,48,0.1)",
+                      background: badgeColor,
                       display: "flex", alignItems: "center", justifyContent: "center",
                       marginRight: 12, flexShrink: 0,
                     }}>
-                      <span style={{ fontSize: 13, fontWeight: 700, color: isPresent ? "#2563EB" : "#FF3B30" }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: numColor }}>
                         {student.id}
                       </span>
                     </div>
+
+                    {/* Name & Roll */}
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
                         fontSize: 15, fontWeight: 600, color: "#1C1C1E",
@@ -556,10 +597,29 @@ function AttendanceApp({ students, onReset }) {
                         {student.roll !== "N/A" && student.roll !== "" ? student.roll : student.reg}
                       </div>
                     </div>
+
+                    {/* OD Button */}
+                    <div
+                      onClick={(e) => toggleOD(student.id, e)}
+                      style={{
+                        marginRight: 10,
+                        padding: "4px 10px",
+                        borderRadius: 8,
+                        fontSize: 11, fontWeight: 700,
+                        cursor: "pointer",
+                        border: `1.5px solid ${isOD ? "#2563EB" : "#C7C7CC"}`,
+                        background: isOD ? "#2563EB" : "transparent",
+                        color: isOD ? "#fff" : "#8E8E93",
+                        transition: "all 0.2s",
+                        flexShrink: 0,
+                      }}
+                    >OD</div>
+
+                    {/* Present/Absent Checkbox */}
                     <div style={{
                       width: 28, height: 28, borderRadius: 8,
-                      border: isPresent ? "none" : "2px solid #C7C7CC",
-                      background: isPresent ? "#34C759" : "transparent",
+                      border: isPresent ? "none" : isOD ? "none" : "2px solid #C7C7CC",
+                      background: isPresent ? "#34C759" : isOD ? "rgba(37,99,235,0.15)" : "transparent",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       transition: "all 0.2s", flexShrink: 0,
                     }}>
@@ -567,6 +627,14 @@ function AttendanceApp({ students, onReset }) {
                         <svg width="14" height="11" viewBox="0 0 14 11" fill="none">
                           <path d="M1 5L5.5 9.5L13 1" stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
+                      )}
+                      {isAbsent && (
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                          <path d="M1 1L11 11M11 1L1 11" stroke="#FF3B30" strokeWidth="2.2" strokeLinecap="round"/>
+                        </svg>
+                      )}
+                      {isOD && (
+                        <span style={{ fontSize: 10, fontWeight: 800, color: "#2563EB" }}>OD</span>
                       )}
                     </div>
                   </div>
@@ -626,7 +694,7 @@ function AttendanceApp({ students, onReset }) {
                 </div>
                 <div style={{ fontSize: 11, color: "#8E8E93", fontWeight: 600 }}>↑ Roll No. order</div>
               </div>
-              {getSortedAbsentees().map((s, i) => (
+              {sortByRoll(absentees).map((s, i) => (
                 <div key={s.id} style={{
                   display: "flex", gap: 10, padding: "7px 0",
                   borderBottom: i < absentees.length - 1 ? "1px solid #F2F2F7" : "none",
@@ -645,7 +713,37 @@ function AttendanceApp({ students, onReset }) {
             </div>
           )}
 
-          {absentCount === 0 && (
+          {odCount > 0 && (
+            <div style={{
+              background: "#fff", borderRadius: 16, padding: 16, marginBottom: 14,
+              boxShadow: "0 1px 6px rgba(0,0,0,0.06)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#2563EB", textTransform: "uppercase", letterSpacing: 0.5 }}>
+                  🔵 On Duty — OD ({odCount})
+                </div>
+                <div style={{ fontSize: 11, color: "#8E8E93", fontWeight: 600 }}>↑ Roll No. order</div>
+              </div>
+              {sortByRoll(odStudents).map((s, i) => (
+                <div key={s.id} style={{
+                  display: "flex", gap: 10, padding: "7px 0",
+                  borderBottom: i < odStudents.length - 1 ? "1px solid #F2F2F7" : "none",
+                }}>
+                  <span style={{ color: "#8E8E93", fontSize: 13, minWidth: 20 }}>{i + 1}.</span>
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: "#1C1C1E" }}>{s.name}</div>
+                    <div style={{ fontSize: 12, color: "#8E8E93" }}>
+                      {numFormat === "roll" && s.roll}
+                      {numFormat === "reg"  && s.reg}
+                      {numFormat === "both" && `Roll: ${s.roll}  |  Reg: ${s.reg}`}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {absentCount === 0 && odCount === 0 && (
             <div style={{
               background: "rgba(52,199,89,0.1)",
               border: "1.5px solid rgba(52,199,89,0.3)",

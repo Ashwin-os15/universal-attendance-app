@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">UNI ATTENDANCE </string>
+    <string name="title_activity_main">UNI ATTENDANCE </string>
+    <string name="package_name">com.ashwin.uniattendance</string>
+    <string name="custom_url_scheme">com.ashwin.uniattendance</string>
+</resources>
