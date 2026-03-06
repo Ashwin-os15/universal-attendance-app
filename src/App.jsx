@@ -121,7 +121,7 @@ function UploadScreen({ onStudentsLoaded }) {
             fontSize: 36,
           }}>📋</div>
           <h1 style={{ fontSize: 28, fontWeight: 800, color: "#1C1C1E", margin: 0 }}>
-            Attendance Tracker
+            UNI ATTENDANCE
           </h1>
           <p style={{ fontSize: 15, color: "#8E8E93", marginTop: 8, lineHeight: 1.5 }}>
             Upload your class Excel sheet to get started.<br />
@@ -250,8 +250,8 @@ function AttendanceApp({ students, onReset }) {
       return `${i + 1}. ${s.name}`;
     };
     return absentCount === 0
-      ? `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n✅ Full Attendance! All ${students.length} students were present.\n\n_Made by Attendance Tracker_`
-      : `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n👥 Total Students: ${students.length}\n✅ Present: ${presentCount}\n❌ Absent: ${absentCount}\n\n*Absentees (sorted by Roll No.):*\n${sorted.map((s, i) => fmtStudent(s, i)).join("\n")}\n\n_Made by Attendance Tracker_`;
+      ? `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n✅ Full Attendance! All ${students.length} students were present.\n\n_Made with Uni Attendance_`
+      : `📋 *Attendance Report*\n📅 Date: ${displayDate}\n\n👥 Total Students: ${students.length}\n✅ Present: ${presentCount}\n❌ Absent: ${absentCount}\n\n*Absentees (sorted by Roll No.):*\n${sorted.map((s, i) => fmtStudent(s, i)).join("\n")}\n\n_Made with Uni Attendance_`;
   };
 
   const message = buildMessage(numFormat || "roll");
@@ -394,7 +394,7 @@ function AttendanceApp({ students, onReset }) {
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
           <div style={{ fontSize: 13, opacity: 0.75, letterSpacing: 1, textTransform: "uppercase" }}>
-            Class Attendance
+            UNI ATTENDANCE
           </div>
           <button onClick={() => setShowResetConfirm(true)} style={{
             background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 10,
@@ -706,7 +706,7 @@ function AttendanceApp({ students, onReset }) {
         textAlign: "center", padding: "16px 0 100px",
         fontSize: 11, color: "#C7C7CC", fontWeight: 500, letterSpacing: 0.3,
       }}>
-        Attendance Tracker
+        Made by Ashwin Vijayan
       </div>
 
       {/* Bottom Tab Bar */}
